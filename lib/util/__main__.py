@@ -6,4 +6,4 @@ if __name__ == '__main__':
 
     if args.file_extension_stats:
         # Download pull request clones and build the dataset
-        statistics.file_extensions()
+        statistics.file_extensions(aggregate=args.aggregate)
