@@ -6,7 +6,8 @@ from lib.data import fetch
 from lib.util import plot
 
 
-def file_extensions(aggregate=False, save_plot=False, output_path=None):
+def file_extensions(aggregate=False, save_plot=False,
+                    output_path=os.path.join('data', 'plots', 'file_extension_stats.png')):
     """
 
     :param aggregate:
@@ -14,7 +15,6 @@ def file_extensions(aggregate=False, save_plot=False, output_path=None):
     :param output_path:
     :return:
     """
-    # TODO: Add method for plotting results
     total_count = 0
     extension_counts = dict()
     pr_clones = fetch.pull_request_clones()
@@ -41,15 +41,15 @@ def file_extensions(aggregate=False, save_plot=False, output_path=None):
                     else:
                         extension_counts[extension] = 1
 
-    graph_labels, graph_values = list(), list()
-    filter_extensions = {'.php', '.js', '.py', '.go', '.rb', '.rst', '.sh', '.java', '.cpp', '.c'}
-    for extension, count in sorted(extension_counts.items(), key=lambda item: item[1], reverse=True):
-        extension_counts[extension] = (count/total_count, count)
-        if extension in filter_extensions:
-            graph_labels.append(extension)
-            graph_values.append(count/total_count)
-    plot.bar_chart(graph_values, graph_labels, "File extension", "Percentage of pull requests",
-                   output_path=os.path.join('data', 'plots', 'file_extension_stats.png'))
+    if save_plot:
+        graph_labels, graph_values = list(), list()
+        filter_extensions = {'.php', '.js', '.py', '.go', '.rb', '.rst', '.sh', '.java', '.cpp', '.c'}
+        for extension, count in sorted(extension_counts.items(), key=lambda item: item[1], reverse=True):
+            extension_counts[extension] = (count/total_count, count)
+            if extension in filter_extensions:
+                graph_labels.append(extension)
+                graph_values.append(count/total_count)
+        plot.bar_chart(graph_values, graph_labels, "File extension", "Percentage of pull requests", output_path)
 
     print("Total count:", total_count)
     for extension, count_pair in sorted(extension_counts.items(), key=lambda item: item[1], reverse=True):
