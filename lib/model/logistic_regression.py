@@ -1,29 +1,20 @@
 import numpy as np
-from nltk import word_tokenize
 from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
 from scipy import sparse
 from sklearn import linear_model
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.model_selection import StratifiedKFold
-from sklearn.ensemble import RandomForestClassifier
+
+from lib.util.preprocessing import tokenize
 
 english_stopwords = stopwords.words("english")
-
-
-def tokenize(text, stemming=True):
-    words = [word.lower() for word in word_tokenize(text) if word.lower() not in english_stopwords]
-    if stemming:
-        words = [PorterStemmer().stem(word) for word in words]
-    return words
 
 
 class LogisticRegression:
     def __init__(self):
         self.vectorizer = TfidfVectorizer(stop_words=english_stopwords, tokenizer=tokenize)
         self.classifier = linear_model.LogisticRegression(random_state=37)
-        # self.classifier = RandomForestClassifier(n_jobs=6, n_estimators=500, random_state=37)
 
     def train(self, train_x1, train_x2, train_y):
         self.vectorizer.fit(np.concatenate((train_x1, train_x2), axis=0))
