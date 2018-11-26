@@ -1,8 +1,10 @@
-from tensorflow.python.keras.utils import to_categorical
-from tensorflow.python.keras.preprocessing.text import Tokenizer, text_to_word_sequence
-from tensorflow.python.keras.preprocessing.sequence import pad_sequences
-from nltk import tokenize
+import nltk
 import numpy as np
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
+from tensorflow.python.keras.preprocessing.text import Tokenizer, text_to_word_sequence
+from tensorflow.python.keras.utils import to_categorical
 
 
 def read_csv(path, headers=True):
@@ -30,8 +32,16 @@ def to_extended_categorical(y, num_classes=None):
     return categorical
 
 
-def make_hierarchical_network_ready(data, num_classes, tokenizer=None, max_sequence_len=200, max_sequences=20,
-                                    enforce_max_len=False, filter_words=False):
+def tokenize(text, stemming=True):
+    english_stopwords = stopwords.words("english")
+    words = [word.lower() for word in nltk.word_tokenize(text) if word.lower() not in english_stopwords]
+    if stemming:
+        words = [PorterStemmer().stem(word) for word in words]
+    return words
+
+
+def hierarchical_tokenize_and_pad(data, tokenizer=None, max_sequence_len=200, max_sequences=20,
+                                  enforce_max_len=False, filter_words=False):
     temp_data = list()
     for seq in data[:,0]:
         temp_data.append(' '.join(seq.split()))
@@ -42,8 +52,8 @@ def make_hierarchical_network_ready(data, num_classes, tokenizer=None, max_seque
     raw_data = list()
     max_sequences_actual = -1
     max_sequence_len_actual = -1
-    for seq in data[:,0]:
-        sentences = tokenize.sent_tokenize(seq)
+    for seq in data[:, 0]:
+        sentences = nltk.tokenize.sent_tokenize(seq)
         raw_data.append(sentences)
         max_sequences_actual = max(len(sentences), max_sequences_actual)
         for sentence in sentences:
@@ -73,13 +83,10 @@ def make_hierarchical_network_ready(data, num_classes, tokenizer=None, max_seque
                         if not filter_words or tokenizer.word_index[word] not in index_filter:
                                 data_x[i, j, k] = tokenizer.word_index[word]
                         k = k + 1
-
-    data_y = [int(x) for x in data[:,1]]
-    data_y_cat = to_categorical(data_y, num_classes=num_classes)
-    return data_x, data_y_cat, tokenizer, max_sequence_len, max_sequences
+    return data_x, tokenizer, max_sequence_len, max_sequences
 
 
-def make_network_ready(data, num_classes, tokenizer=None, max_sequence_len=400, enforce_max_len=False, filter_words=False):
+def tokenize_and_pad(data, tokenizer=None, max_sequence_len=400, enforce_max_len=False, filter_words=False):
     if tokenizer is None:
         tokenizer = Tokenizer(filters='!"#$%&()*+,./:;<=>?@[\]^_`{|}~', lower=True)
         tokenizer.fit_on_texts(data[:,0])
@@ -104,6 +111,4 @@ def make_network_ready(data, num_classes, tokenizer=None, max_sequence_len=400, 
     if not enforce_max_len:
         max_sequence_len = min(max_sequence_len, max(seq_lengths))
     data_x = pad_sequences(sequences, maxlen=max_sequence_len)
-    data_y = [int(x) for x in data[:,1]]
-    data_y_cat = to_categorical(data_y, num_classes=num_classes)
-    return data_x, data_y_cat, tokenizer, max_sequence_len
+    return data_x, tokenizer, max_sequence_len
