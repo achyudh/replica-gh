@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 def get_args():
     parser = ArgumentParser(description="Machine learning models for Replica-GH.")
-    parser.add_argument('--model', type=str, default='static', choices=['logistic_regression'])
+    parser.add_argument('--model', type=str, default='static', choices=['logistic_regression', 'random_forest', 'kim_cnn'])
     parser.add_argument('--gpu', type=int, default=0)  # If the value is -1, use CPU
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=1024)
