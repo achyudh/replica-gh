@@ -5,3 +5,5 @@ data/
 lib/util/__pycache__/
 
 lib/model/__pycache__/
+
+*.pyc
