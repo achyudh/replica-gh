@@ -3,3 +3,5 @@ config\.json
 data/
 
 lib/util/__pycache__/
+
+lib/model/__pycache__/
