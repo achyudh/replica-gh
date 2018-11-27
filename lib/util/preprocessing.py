@@ -4,7 +4,6 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.keras.preprocessing.text import Tokenizer, text_to_word_sequence
-from tensorflow.python.keras.utils import to_categorical
 
 
 def read_csv(path, headers=True):
@@ -86,11 +85,11 @@ def hierarchical_tokenize_and_pad(data, tokenizer=None, max_sequence_len=200, ma
     return data_x, tokenizer, max_sequence_len, max_sequences
 
 
-def tokenize_and_pad(data, tokenizer=None, max_sequence_len=400, enforce_max_len=False, filter_words=False):
+def tokenize_and_pad(data, tokenizer=None, max_sequence_len=500, enforce_max_len=False, filter_words=False):
     if tokenizer is None:
         tokenizer = Tokenizer(filters='!"#$%&()*+,./:;<=>?@[\]^_`{|}~', lower=True)
-        tokenizer.fit_on_texts(data[:,0])
-    raw_sequences = tokenizer.texts_to_sequences(data[:,0])
+        tokenizer.fit_on_texts(data)
+    raw_sequences = tokenizer.texts_to_sequences(data)
 
     if filter_words:
         sequences = list()
