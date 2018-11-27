@@ -2,7 +2,7 @@ import numpy as np
 import gensim
 
 
-def train_gensim(x, size=100, min_count=5):
+def train(x, size=100, min_count=5):
     """
     Train a Word2Vec model from scratch with Gensim
     :param x: A list of tokenized texts (i.e. list of lists of tokens)
@@ -14,7 +14,7 @@ def train_gensim(x, size=100, min_count=5):
     return model
 
 
-def load_gensim(model_path='data/embedding/word2vec/googlenews_size300.bin', binary=True):
+def load(model_path='data/embedding/word2vec/googlenews_size300.bin', binary=True):
     if binary:
         return gensim.models.KeyedVectors.load_word2vec_format(model_path, binary=True)
     else:
@@ -26,7 +26,7 @@ def embedding_matrix(word_index, model_path='data/embedding/word2vec/googlenews_
         size = int(model_path.split('.')[-2].split('/')[-1].split('_')[1][4:])
     else:
         size = int(model_path.split('/')[-1].split('_')[1][4:])
-    w2v = load_gensim(model_path, binary)
+    w2v = load(model_path, binary)
     embedding_map = np.zeros((len(word_index) + 1, size))
     for word, i in word_index.items():
         if word in w2v:
