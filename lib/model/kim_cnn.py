@@ -6,13 +6,18 @@ from tensorflow.python.keras.models import Model
 
 
 class KimCNN:
-    def __init__(self, embedding_map, embedding_dim, tokenizer, max_sequence_len, num_classes, dataset_name):
-        self.dataset_name = dataset_name
-        self.num_classes = num_classes
+    def __init__(self, embedding_map, tokenizer, model_config):
+        self.model_config = model_config
+        self.tokenizer = tokenizer
+        self.embedding_map = embedding_map
+        self.model = None
+
+    def create_model(self):
         # Declaration for KimCNN-based encoder
-        encoder_input = Input(shape=(max_sequence_len,), dtype='int32')
-        embedding_layer = Embedding(len(tokenizer.word_index) + 1, embedding_dim, weights=[embedding_map],
-                                    input_length=max_sequence_len, trainable=False)
+        encoder_input = Input(shape=(self.model_config.max_sequence_len,), dtype='int32')
+        embedding_layer = Embedding(len(self.tokenizer.word_index) + 1, self.model_config.word_embedding_dim,
+                                    weights=[self.embedding_map], input_length=self.model_config.max_sequence_len,
+                                    trainable=False)
         embedded_sequences = embedding_layer(encoder_input)
 
         l_conv1 = Conv1D(100, 3, activation='relu', padding='same')(embedded_sequences)
@@ -25,23 +30,28 @@ class KimCNN:
         encoder = Model(encoder_input, l_concat1)
 
         # Similarity classifier using the KimCNN-based encoder
-        sequence_input1 = Input(shape=(max_sequence_len,), dtype='int32')
-        sequence_input2 = Input(shape=(max_sequence_len,), dtype='int32')
+        sequence_input1 = Input(shape=(self.model_config.max_sequence_len,), dtype='int32')
+        sequence_input2 = Input(shape=(self.model_config.max_sequence_len,), dtype='int32')
         l_concat2 = Concatenate()([encoder(sequence_input1), encoder(sequence_input2)])
-        l_dense1 = Dense(100, activation='relu')(l_concat2)
-        l_dropout1 = Dropout(0.4)(l_dense1)
-        preds = Dense(num_classes, activation='softmax')(l_dropout1)
+        l_dense1 = Dense(self.model_config.hidden_dim, activation='relu')(l_concat2)
+        l_dropout1 = Dropout(self.model_config.dropout)(l_dense1)
+        preds = Dense(self.model_config.num_classes, activation='softmax')(l_dropout1)
         self.model = Model([sequence_input1, sequence_input2], preds)
-        self.model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+        self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         self.model.summary()
 
-    def train(self, train_x1, train_x2, train_y, evaluate_x1, evaluate_x2, evaluate_y):
-        early_stopping_callback = EarlyStopping(patience=5, monitor='val_acc')
-        checkpoint_callback = ModelCheckpoint(filepath="data/models/cnn/%s.hdf5" % self.dataset_name,
-                                              monitor='val_acc', verbose=1, save_best_only=True)
+    def train(self, train_x1, train_x2, train_y, evaluate_x1, evaluate_x2, evaluate_y, **kwargs):
+        iteration = 0
+        if 'iteration' in kwargs:
+            iteration = kwargs['iteration']
+        early_stopping_callback = EarlyStopping(patience=self.model_config.patience, monitor='val_acc')
+        checkpoint_callback = ModelCheckpoint(filepath="data/checkpoints/kim_cnn/%s_%d.hdf5" %
+                                                       (self.model_config.dataset, iteration),
+                                                       monitor='val_acc', verbose=1, save_best_only=True)
         self.model.fit([train_x1, train_x2], train_y, validation_data=([evaluate_x1, evaluate_x2], evaluate_y),
-                       epochs=20, batch_size=64, callbacks=[early_stopping_callback, checkpoint_callback])
-        self.model.load_weights("data/models/cnn/%s.hdf5" % self.dataset_name)
+                       epochs=self.model_config.epochs, batch_size=self.model_config.batch_size,
+                       callbacks=[early_stopping_callback, checkpoint_callback])
+        self.model.load_weights(filepath="data/checkpoints/kim_cnn/%s_%d.hdf5" % (self.model_config.dataset, iteration))
 
     def predict(self, predict_x1, predict_x2):
         return self.model.predict([predict_x1, predict_x2])
@@ -57,18 +67,19 @@ class KimCNN:
         print("Performing cross validation (%d-fold)..." % n_splits)
         iteration = 1
         mean_accuracy = 0
-        recall_list = [0 for _ in range(self.num_classes)]
-        precision_list = [0 for _ in range(self.num_classes)]
+        recall_list = [0 for _ in range(self.model_config.num_classes)]
+        precision_list = [0 for _ in range(self.model_config.num_classes)]
         for train_index, test_index in skf.split(data_x1, data_y.argmax(axis=1)):
+            self.create_model()
             print("Iteration %d of %d" % (iteration, n_splits))
-            iteration += 1
             self.train(data_x1[train_index], data_x2[train_index], data_y[train_index],
-                       data_x1[test_index], data_x2[test_index], data_y[test_index])
+                       data_x1[test_index], data_x2[test_index], data_y[test_index], iteration=iteration)
             metrics = self.evaluate(data_x1[test_index], data_x2[test_index], data_y[test_index])
             precision_list = [x + y for x, y in zip(metrics['individual'][0], precision_list)]
             recall_list = [x + y for x, y in zip(metrics['individual'][1], recall_list)]
             mean_accuracy += metrics['micro-average'][0]
             print("Precision, Recall, F_Score, Support")
+            iteration += 1
             print(metrics)
         print("Mean accuracy: %s Mean precision: %s, Mean recall: %s" % (mean_accuracy/n_splits,
                                                                          [precision/n_splits for precision in precision_list],
