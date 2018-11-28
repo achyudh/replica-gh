@@ -12,7 +12,11 @@ def train(input_path, language, size=300, min_count=20):
         try:
             tokenized_repository.append(preprocessing.tokenize_code(blob, language))
         except SyntaxError:
-            print('SyntaxError:', ' '.join(blob[:50].split()))
+            print('SyntaxError:', ' '.join(blob[:50].split()) + "...")
+        except TimeoutError:
+            print('TimeoutError:', ' '.join(blob[:50].split()) + "...")
+        if len(tokenized_repository) % 1000 == 0:
+            print("Tokenized %d of %d..." % (len(tokenized_repository), len(code_repository)))
     print('Size of code repository:', len(code_repository))
     print("Training baseline code embeddings...")
     model = gensim.models.Word2Vec(tokenized_repository, size=size, workers=8, min_count=min_count)

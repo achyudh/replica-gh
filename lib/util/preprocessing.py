@@ -4,6 +4,7 @@ import numbers
 import astor
 import nltk
 import numpy as np
+import timeout_decorator
 from nltk import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
@@ -69,6 +70,7 @@ def tokenize_words(text, stemming=True):
     return words
 
 
+@timeout_decorator.timeout(60)
 def tokenize_code(blob, language):
     if language == 'python':
         parsed_code = astor.to_source(ast.parse(blob))
