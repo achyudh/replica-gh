@@ -1,9 +1,39 @@
+import ast
+import numbers
+
+import astor
 import nltk
 import numpy as np
+from nltk import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.keras.preprocessing.text import Tokenizer, text_to_word_sequence
+
+
+def is_numeric(obj):
+    if isinstance(obj, numbers.Number):
+        return True
+    elif isinstance(obj, str):
+        try:
+            nodes = list(ast.walk(ast.parse(obj)))[1:]
+        except SyntaxError:
+            return False
+        if not isinstance(nodes[0], ast.Expr):
+            return False
+        if not isinstance(nodes[-1], ast.Num):
+            return False
+        nodes = nodes[1:-1]
+        for i in range(len(nodes)):
+            if i % 2 == 0:
+                if not isinstance(nodes[i], ast.UnaryOp):
+                    return False
+            else:
+                if not isinstance(nodes[i], (ast.USub, ast.UAdd)):
+                    return False
+        return True
+    else:
+        return False
 
 
 def read_csv(path, headers=True):
@@ -31,12 +61,51 @@ def to_extended_categorical(y, num_classes=None):
     return categorical
 
 
-def tokenize(text, stemming=True):
+def tokenize_words(text, stemming=True):
     english_stopwords = stopwords.words("english")
     words = [word.lower() for word in nltk.word_tokenize(text) if word.lower() not in english_stopwords]
     if stemming:
         words = [PorterStemmer().stem(word) for word in words]
     return words
+
+
+def tokenize_code(blob, language):
+    if language == 'python':
+        parsed_code = astor.to_source(ast.parse(blob))
+        tokenized_code = [x for x in RegexpTokenizer(r'\w+').tokenize(parsed_code) if not is_numeric(x)]
+        return tokenized_code
+    elif language == 'java':
+        pass
+    else:
+        raise Exception("Unsupported language")
+
+
+def tokenize_and_pad(data, tokenizer=None, max_sequence_len=500, enforce_max_len=False, filter_words=False):
+    if tokenizer is None:
+        tokenizer = Tokenizer(filters='!"#$%&()*+,./:;<=>?@[\]^_`{|}~', lower=True)
+        tokenizer.fit_on_texts(data)
+    raw_sequences = tokenizer.texts_to_sequences(data)
+
+    if filter_words:
+        sequences = list()
+        index_filter = set()
+        for word, i in tokenizer.word_index.items():
+            if not (word.isalpha() or "'" in word or "-" in word):
+                index_filter.add(i)
+        for seq in raw_sequences:
+            new_seq = list()
+            for i in seq:
+                if i not in index_filter:
+                    new_seq.append(i)
+            sequences.append(new_seq)
+    else:
+        sequences = raw_sequences
+
+    seq_lengths = [len(seq) for seq in sequences]
+    if not enforce_max_len:
+        max_sequence_len = min(max_sequence_len, max(seq_lengths))
+    data_x = pad_sequences(sequences, maxlen=max_sequence_len)
+    return data_x, tokenizer, max_sequence_len
 
 
 def hierarchical_tokenize_and_pad(data, tokenizer=None, max_sequence_len=200, max_sequences=20,
@@ -83,31 +152,3 @@ def hierarchical_tokenize_and_pad(data, tokenizer=None, max_sequence_len=200, ma
                                 data_x[i, j, k] = tokenizer.word_index[word]
                         k = k + 1
     return data_x, tokenizer, max_sequence_len, max_sequences
-
-
-def tokenize_and_pad(data, tokenizer=None, max_sequence_len=500, enforce_max_len=False, filter_words=False):
-    if tokenizer is None:
-        tokenizer = Tokenizer(filters='!"#$%&()*+,./:;<=>?@[\]^_`{|}~', lower=True)
-        tokenizer.fit_on_texts(data)
-    raw_sequences = tokenizer.texts_to_sequences(data)
-
-    if filter_words:
-        sequences = list()
-        index_filter = set()
-        for word, i in tokenizer.word_index.items():
-            if not (word.isalpha() or "'" in word or "-" in word):
-                index_filter.add(i)
-        for seq in raw_sequences:
-            new_seq = list()
-            for i in seq:
-                if i not in index_filter:
-                    new_seq.append(i)
-            sequences.append(new_seq)
-    else:
-        sequences = raw_sequences
-
-    seq_lengths = [len(seq) for seq in sequences]
-    if not enforce_max_len:
-        max_sequence_len = min(max_sequence_len, max(seq_lengths))
-    data_x = pad_sequences(sequences, maxlen=max_sequence_len)
-    return data_x, tokenizer, max_sequence_len

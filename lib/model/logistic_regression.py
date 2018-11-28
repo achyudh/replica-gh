@@ -6,14 +6,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.model_selection import StratifiedKFold
 
-from lib.util.preprocessing import tokenize
+from lib.util.preprocessing import tokenize_words
 
 english_stopwords = stopwords.words("english")
 
 
 class LogisticRegression:
     def __init__(self):
-        self.vectorizer = TfidfVectorizer(stop_words=english_stopwords, tokenizer=tokenize)
+        self.vectorizer = TfidfVectorizer(stop_words=english_stopwords, tokenizer=tokenize_words)
         self.classifier = linear_model.LogisticRegression(random_state=37)
 
     def train(self, train_x1, train_x2, train_y):
