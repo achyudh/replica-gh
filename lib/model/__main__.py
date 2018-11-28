@@ -72,10 +72,10 @@ if __name__ == '__main__':
 
         if args.word_embedding == 'google_news':
             embedding_map = gensim.embedding_matrix(tokenizer.word_index, binary=True,
-                                                    model_path='data/embedding/word2vec/googlenews_size300.bin')
+                                                    model_path='data/embeddings/word/googlenews_size300.bin')
         elif args.word_embedding == 'github':
             embedding_map = gensim.embedding_matrix(tokenizer.word_index, binary=False,
-                                                    model_path='data/embedding/word2vec/github_size300')
+                                                    model_path='data/embeddings/word/github_size300')
         else:
             raise Exception("Unsupported word embedding")
 
