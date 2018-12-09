@@ -11,6 +11,7 @@ def get_args():
     parser.add_argument('--input_path', type=str, default=os.path.join('data', 'repositories'))
     parser.add_argument('--save_path', type=str, default=os.path.join('data', 'embeddings'))
     parser.add_argument('--dim', type=int, default=300)
+    parser.add_argument('--min-count', type=int, default=20)
 
     args = parser.parse_args()
     return args
