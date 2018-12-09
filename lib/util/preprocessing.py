@@ -1,7 +1,9 @@
 import ast
 import numbers
+import os
 
 import astor
+import dill as dpickle
 import nltk
 import numpy as np
 import timeout_decorator
@@ -10,9 +12,15 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.keras.preprocessing.text import Tokenizer, text_to_word_sequence
+from unidiff import PatchSet
 
 
 def is_numeric(obj):
+    """
+
+    :param obj:
+    :return:
+    """
     if isinstance(obj, numbers.Number):
         return True
     elif isinstance(obj, str):
@@ -38,6 +46,12 @@ def is_numeric(obj):
 
 
 def read_csv(path, headers=True):
+    """
+
+    :param path:
+    :param headers:
+    :return:
+    """
     result = list()
     with open(path) as csv_file:
         if headers:
@@ -51,6 +65,12 @@ def read_csv(path, headers=True):
 
 
 def to_extended_categorical(y, num_classes=None):
+    """
+
+    :param y:
+    :param num_classes:
+    :return:
+    """
     y = np.array(y, dtype='int').ravel()
     if not num_classes:
         num_classes = np.max(y) + 1
@@ -62,7 +82,25 @@ def to_extended_categorical(y, num_classes=None):
     return categorical
 
 
+def get_code_changes(diff, filter_extension):
+    code_changes = list()
+    patch = PatchSet(diff)
+    for file in patch.added_files + patch.modified_files + patch.removed_files:
+        if os.path.splitext(file.path)[1] == filter_extension:
+            for hunk in file:
+                for line in hunk:
+                    if not line.value.isspace() and not line.value.strip().startswith('#'):
+                        code_changes.append(line.value)
+    return ''.join(code_changes)
+
+
 def tokenize_words(text, stemming=True):
+    """
+
+    :param text:
+    :param stemming:
+    :return:
+    """
     english_stopwords = stopwords.words("english")
     words = [word.lower() for word in nltk.word_tokenize(text) if word.lower() not in english_stopwords]
     if stemming:
@@ -70,8 +108,14 @@ def tokenize_words(text, stemming=True):
     return words
 
 
-@timeout_decorator.timeout(60)
+@timeout_decorator.timeout(10)
 def tokenize_code(blob, language):
+    """
+
+    :param blob:
+    :param language:
+    :return:
+    """
     if language == 'python':
         parsed_code = astor.to_source(ast.parse(blob))
         tokenized_code = [x for x in RegexpTokenizer(r'\w+').tokenize(parsed_code) if not is_numeric(x)]
@@ -82,9 +126,21 @@ def tokenize_code(blob, language):
         raise Exception("Unsupported language")
 
 
-def tokenize_and_pad(data, tokenizer=None, max_sequence_len=500, enforce_max_len=False, filter_words=False):
+def tokenize_and_pad(data, tokenizer=None, max_sequence_len=500, enforce_max_len=False, filters=None,
+                     filter_words=False, lower=True):
+    """
+
+    :param data:
+    :param tokenizer:
+    :param max_sequence_len:
+    :param enforce_max_len:
+    :param filter_words:
+    :return:
+    """
     if tokenizer is None:
-        tokenizer = Tokenizer(filters='!"#$%&()*+,./:;<=>?@[\]^_`{|}~', lower=True)
+        if filters is None:
+            filters = '!"#$%&()*+,./:;<=>?@[\]^_`{|}~'
+        tokenizer = Tokenizer(filters=filters, lower=lower)
         tokenizer.fit_on_texts(data)
     raw_sequences = tokenizer.texts_to_sequences(data)
 
@@ -112,6 +168,16 @@ def tokenize_and_pad(data, tokenizer=None, max_sequence_len=500, enforce_max_len
 
 def hierarchical_tokenize_and_pad(data, tokenizer=None, max_sequence_len=200, max_sequences=20,
                                   enforce_max_len=False, filter_words=False):
+    """
+
+    :param data:
+    :param tokenizer:
+    :param max_sequence_len:
+    :param max_sequences:
+    :param enforce_max_len:
+    :param filter_words:
+    :return:
+    """
     temp_data = list()
     for seq in data[:,0]:
         temp_data.append(' '.join(seq.split()))
@@ -154,3 +220,52 @@ def hierarchical_tokenize_and_pad(data, tokenizer=None, max_sequence_len=200, ma
                                 data_x[i, j, k] = tokenizer.word_index[word]
                         k = k + 1
     return data_x, tokenizer, max_sequence_len, max_sequences
+
+
+def load_text_processor(input_path='title_pp.dpkl'):
+    """
+    Load preprocessors from disk.
+    :param input_path: path of ktext.proccessor object
+    :return: size of vocabulary loaded into ktext.processor, the processor
+    """
+    # Load files from disk
+    with open(input_path, 'rb') as f:
+        pp = dpickle.load(f)
+
+    num_tokens = max(pp.id2token.keys()) + 1
+    return num_tokens, pp
+
+
+def load_decoder_inputs(input_path='train_title_vecs.npy'):
+    """
+    Load decoder inputs.
+    :param input_path: The data fed to the decoder as input during training for teacher forcing.
+    :return: The data that the decoder data is trained to generate (issue title).
+    """
+    vectorized_title = np.load(input_path)
+    # For Decoder Input, you don't need the last word as that is only for prediction
+    # when we are training using Teacher Forcing.
+    decoder_input_data = vectorized_title[:, :-1]
+
+    # Decoder Target Data Is Ahead By 1 Time Step From Decoder Input Data (Teacher Forcing)
+    decoder_target_data = vectorized_title[:, 1:]
+
+    return decoder_input_data, decoder_target_data
+
+
+def extract_encoder_model(model):
+    """
+    Extract the encoder from the original Sequence to Sequence Model.
+    :param model: keras model object
+    :return: keras model object
+    """
+    encoder_model = model.get_layer('Encoder-Model')
+    return encoder_model
+
+
+def get_aux_features(pull_request):
+    year = float(pull_request['created_at'][:4])
+    month = float(pull_request['created_at'][5:7])
+    day = float(pull_request['created_at'][8:10])
+    return [pull_request['number'], pull_request['additions'], pull_request['deletions'], pull_request['commits'],
+            pull_request['changed_files'], year, month, day]
