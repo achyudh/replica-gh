@@ -1,4 +1,4 @@
-# Replica-GH
+# ReplicaGH
 
 > A collection of deep learning models for supervised detection of pull request clones
 
