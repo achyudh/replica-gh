@@ -2,21 +2,27 @@ import numpy as np
 import gensim
 
 
-def train(x, size=100, min_count=5):
+def train(x, dim=100, min_count=5):
     """
     Train a Word2Vec model from scratch with Gensim
     :param min_count:
-    :param size:
+    :param dim:
     :param x: A list of tokenized texts (i.e. list of lists of tokens)
     :return: A trained Word2Vec model
     """
     print("Training Word2Vec...")
-    model = gensim.models.Word2Vec(x, size=size, workers=8, min_count=min_count)
-    model.save('data/embeddings/word/gensim_size%s_min%s' % (size, min_count))
+    model = gensim.models.Word2Vec(x, size=dim, workers=8, min_count=min_count)
+    model.save('data/embeddings/word/gensim_size%s_min%s' % (dim, min_count))
     return model
 
 
 def load(model_path='data/embeddings/word/googlenews_size300.bin', binary=True):
+    """
+
+    :param model_path:
+    :param binary:
+    :return:
+    """
     if binary:
         return gensim.models.KeyedVectors.load_word2vec_format(model_path, binary=True)
     else:
@@ -24,6 +30,13 @@ def load(model_path='data/embeddings/word/googlenews_size300.bin', binary=True):
 
 
 def embedding_matrix(word_index, model_path='data/embeddings/word/googlenews_size300.bin', binary=True):
+    """
+
+    :param word_index:
+    :param model_path:
+    :param binary:
+    :return:
+    """
     if binary:
         size = int(model_path.split('.')[-2].split('/')[-1].split('_')[1][4:])
     else:
